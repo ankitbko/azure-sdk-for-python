@@ -240,7 +240,7 @@ class CopilotAdapter(FoundryCBAgent):
                 f"Creating new Copilot session"
                 + (f" for conversation {conversation_id!r}" if conversation_id else "")
             )
-            session_config = SessionConfig(**config, on_permission_request=_on_permission)
+            session_config = SessionConfig(**config, on_permission_request=_on_permission, streaming=context.stream)
             session = await client.create_session(session_config)
             if conversation_id:
                 self._sessions[conversation_id] = session

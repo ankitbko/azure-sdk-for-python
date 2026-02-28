@@ -19,4 +19,9 @@ COPY samples/copilot_container/install_mcp_packages.py install_mcp_packages.py
 
 EXPOSE 8088
 
-CMD ["python", "main.py"]
+CMD bash -c '\
+    if [ -f /etc/ssl/certs/adc-egress-proxy-ca.crt ]; then \
+    cat /etc/ssl/certs/adc-egress-proxy-ca.crt >> /etc/ssl/certs/ca-certificates.crt && \
+    cat /etc/ssl/certs/adc-egress-proxy-ca.crt >> /usr/local/lib/python3.12/site-packages/certifi/cacert.pem; \
+    fi && \
+    python main.py'

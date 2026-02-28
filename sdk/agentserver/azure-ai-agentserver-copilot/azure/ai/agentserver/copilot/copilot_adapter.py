@@ -497,13 +497,11 @@ async def _iter_copilot_events(session, prompt: str, attachments: Optional[list]
         if attachments:
             msg_opts["attachments"] = attachments
         await session.send(MessageOptions(**msg_opts))
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + timeout
         while True:
-            remaining = deadline - loop.time()
-            if remaining <= 0:
-                raise asyncio.TimeoutError(f"Copilot session idle timeout after {timeout}s")
-            event = await asyncio.wait_for(queue.get(), timeout=remaining)
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=timeout)
+            except asyncio.TimeoutError:
+                raise asyncio.TimeoutError(f"Copilot session idle timeout: no events for {timeout}s")
             if event is None:  # sentinel
                 return
             yield event

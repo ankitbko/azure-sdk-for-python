@@ -15,7 +15,8 @@
 #     -e AZURE_AI_FOUNDRY_API_KEY=<key> \
 #     hackernews-agent
 
-FROM copilot-base:latest
+ARG BASE_IMAGE=acrhostedagentbugbash.azurecr.io/ghcp-adapter:1
+FROM ${BASE_IMAGE}
 
 # Install Node.js for the MCP server (npx requires it)
 RUN apt-get update -qq && apt-get install -y --no-install-recommends nodejs npm && \
@@ -26,3 +27,6 @@ COPY samples/copilot_container/example/hackernews/skills/ /app/foundry/skills/
 
 # Copy MCP server configuration
 COPY samples/copilot_container/example/hackernews/mcp.json /app/foundry/mcp.json
+
+# Pre-install MCP npm packages so npx doesn't download at runtime
+RUN python install_mcp_packages.py /app/foundry/mcp.json

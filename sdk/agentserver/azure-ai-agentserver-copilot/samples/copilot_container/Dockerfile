@@ -12,9 +12,10 @@ RUN pip install --no-cache-dir ./package/ azure-identity "github-copilot-sdk>=0.
 # Create the well-known directories for user content
 RUN mkdir -p /app/foundry/skills
 
-# Copy the base entrypoint and default ACL
+# Copy the base entrypoint, default ACL, and MCP package installer
 COPY samples/copilot_container/main.py main.py
 COPY samples/copilot_container/tools_acl.yaml tools_acl.yaml
+COPY samples/copilot_container/install_mcp_packages.py install_mcp_packages.py
 
 EXPOSE 8088
 

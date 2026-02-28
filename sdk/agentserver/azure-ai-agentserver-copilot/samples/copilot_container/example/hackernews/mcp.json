@@ -1,0 +1,8 @@
+{
+    "hackernews": {
+        "type": "local",
+        "command": "npx",
+        "args": ["-y", "mcp-hacker-news"],
+        "tools": ["*"]
+    }
+}

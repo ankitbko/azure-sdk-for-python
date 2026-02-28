@@ -450,8 +450,11 @@ async def _iter_copilot_events(session, prompt: str, attachments: Optional[list]
         nonlocal last_key, event_count
         # Build a dedup key from type + content
         text = ""
-        if event.data and hasattr(event.data, "content") and event.data.content:
-            text = event.data.content
+        if event.data:
+            if hasattr(event.data, "delta_content") and event.data.delta_content:
+                text = event.data.delta_content
+            elif hasattr(event.data, "content") and event.data.content:
+                text = event.data.content
         key = (event.type, text)
         if key == last_key:
             logger.debug(f"Skipping consecutive duplicate: {event.type}")

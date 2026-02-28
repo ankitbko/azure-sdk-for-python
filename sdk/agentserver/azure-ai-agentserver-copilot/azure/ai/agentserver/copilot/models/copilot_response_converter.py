@@ -183,14 +183,15 @@ class CopilotStreamingResponseConverter:
                 )
 
             # ── Streaming text delta ──────────────────────────────────────────
-            case SessionEvent(type=SessionEventType.ASSISTANT_MESSAGE_DELTA, data=data) if data and data.content:
-                self._accumulated_text += data.content
+            case SessionEvent(type=SessionEventType.ASSISTANT_MESSAGE_DELTA, data=data) if data and (data.delta_content or data.content):
+                delta_text = data.delta_content or data.content
+                self._accumulated_text += delta_text
                 yield ResponseTextDeltaEvent(
                     sequence_number=self.next_sequence(),
                     item_id=item_id,
                     output_index=0,
                     content_index=0,
-                    delta=data.content,
+                    delta=delta_text,
                 )
 
             # ── Token / model usage (arrives BEFORE ASSISTANT_MESSAGE) ────────

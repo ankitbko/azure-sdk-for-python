@@ -7,10 +7,43 @@ Users derive from this image and simply `COPY` their **skills** and
 **MCP server configuration** into well-known paths — no custom Python
 code required.
 
+## Base Image
+
+| Property | Value |
+|----------|-------|
+| **ACR Registry** | `acrhostedagentbugbash` |
+| **Repository** | `ghcp-adapter` |
+| **Current Version** | `7` |
+| **Full Image** | `acrhostedagentbugbash.azurecr.io/ghcp-adapter:7` |
+| **Dockerfile** | `samples/copilot_container/Dockerfile` |
+
+### Versioning
+
+The base image uses **integer version tags** (`:1`, `:2`, `:7`, etc.) — no `latest` tag in ACR.
+
+**When to bump the version:**
+- Any change to the base `Dockerfile` or `main.py` entrypoint
+- Any change to the adapter source code (`azure/ai/agentserver/copilot/`)
+- Dependency updates (`github-copilot-sdk`, `azure-identity`, etc.)
+
+**How to publish a new version:**
+```bash
+# From the azure-ai-agentserver-copilot package root:
+az acr build --registry acrhostedagentbugbash \
+  --image ghcp-adapter:<next-version> \
+  --platform linux/amd64 \
+  --file samples/copilot_container/Dockerfile .
+```
+
+**After publishing**, update the `ARG BASE_IMAGE=` line in all example Dockerfiles:
+- `example/hackernews/Dockerfile`
+- `example/agent-builder/Dockerfile`
+- `example/agent-builder/README.md`
+
 ## Quick Start
 
 ```dockerfile
-FROM copilot-base:latest
+FROM acrhostedagentbugbash.azurecr.io/ghcp-adapter:7
 
 # Add your skills
 COPY my-skills/ /app/foundry/skills/

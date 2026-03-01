@@ -390,7 +390,7 @@ class CopilotStreamingResponseConverter:
         """
         event_name = event.type.name if event.type else "UNKNOWN"
         event_data = self._serialize_event_data(event.data)
-        payload = json.dumps({"copilot_event": event_name, "data": event_data})
+        payload = json.dumps({"copilot_event": event_name, "data": event_data}, default=str)
 
         yield ResponseTextDeltaEvent(
             sequence_number=self.next_sequence(),

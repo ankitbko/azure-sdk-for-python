@@ -15,7 +15,7 @@
 #     -e AZURE_AI_FOUNDRY_API_KEY=<key> \
 #     hackernews-agent
 
-ARG BASE_IMAGE=acrhostedagentbugbash.azurecr.io/ghcp-adapter:5
+ARG BASE_IMAGE=acrhostedagentbugbash.azurecr.io/ghcp-adapter:7
 FROM ${BASE_IMAGE}
 
 # Copy the HN summarizer skill

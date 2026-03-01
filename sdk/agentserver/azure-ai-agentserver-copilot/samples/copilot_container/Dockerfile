@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12
 
 # Ensure Python output is sent straight to the container logs (no buffering)
 ENV PYTHONUNBUFFERED=1
@@ -22,6 +22,10 @@ COPY samples/copilot_container/tools_acl.yaml tools_acl.yaml
 COPY samples/copilot_container/install_mcp_packages.py install_mcp_packages.py
 
 EXPOSE 8088
+
+ENV AZURE_CLI_DISABLE_CONNECTION_VERIFICATION=1
+ENV ADAL_PYTHON_SSL_NO_VERIFY=1
+ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
 CMD bash -c '\
     if [ -f /etc/ssl/certs/adc-egress-proxy-ca.crt ]; then \

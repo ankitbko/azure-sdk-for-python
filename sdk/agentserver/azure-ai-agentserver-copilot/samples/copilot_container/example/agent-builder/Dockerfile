@@ -13,7 +13,7 @@
 #     -e COPILOT_MODEL=claude-opus-4.6 \
 #     agent-builder
 
-ARG BASE_IMAGE=acrhostedagentbugbash.azurecr.io/ghcp-adapter:7
+ARG BASE_IMAGE=acrhostedagentbugbash.azurecr.io/ghcp-adapter:vnext-1
 FROM ${BASE_IMAGE}
 
 # Install fa CLI from pre-built wheel (private repo — not published to PyPI)
@@ -36,10 +36,12 @@ COPY mcp.json /app/foundry/mcp.json
 
 # Override CMD to add az login --identity before starting the agent.
 # Preserves the base image's certificate validation setup.
+# az login runs AFTER cert setup so it can use the proxy CA.
 CMD bash -c '\
     if [ -f /etc/ssl/certs/adc-egress-proxy-ca.crt ]; then \
     cat /etc/ssl/certs/adc-egress-proxy-ca.crt >> /etc/ssl/certs/ca-certificates.crt && \
     cat /etc/ssl/certs/adc-egress-proxy-ca.crt >> /usr/local/lib/python3.12/site-packages/certifi/cacert.pem; \
     fi && \
-    az login --identity --allow-no-subscriptions 2>/dev/null || echo "az login --identity failed (expected locally, works on Foundry)" && \
+    echo "Attempting az login --identity..." && \
+    az login --identity --allow-no-subscriptions 2>&1 && echo "az login succeeded" || echo "az login --identity failed" && \
     python main.py'

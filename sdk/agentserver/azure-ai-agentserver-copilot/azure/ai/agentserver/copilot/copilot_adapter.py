@@ -195,7 +195,12 @@ class CopilotAdapter(FoundryCBAgent):
     async def _ensure_client(self) -> CopilotClient:
         """Lazily start the CopilotClient."""
         if self._client is None:
-            self._client = CopilotClient()
+            client_opts: Dict[str, Any] = {}
+            github_token = os.getenv("COPILOT_GITHUB_TOKEN")
+            if github_token:
+                client_opts["github_token"] = github_token
+                logger.info("Using explicit GitHub token for Copilot authentication")
+            self._client = CopilotClient(client_opts if client_opts else None)
             await self._client.start()
             logger.info("CopilotClient started")
         return self._client

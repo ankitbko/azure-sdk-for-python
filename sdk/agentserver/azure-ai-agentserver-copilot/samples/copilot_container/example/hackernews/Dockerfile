@@ -15,12 +15,8 @@
 #     -e AZURE_AI_FOUNDRY_API_KEY=<key> \
 #     hackernews-agent
 
-ARG BASE_IMAGE=acrhostedagentbugbash.azurecr.io/ghcp-adapter:1
+ARG BASE_IMAGE=acrhostedagentbugbash.azurecr.io/ghcp-adapter:5
 FROM ${BASE_IMAGE}
-
-# Install Node.js for the MCP server (npx requires it)
-RUN apt-get update -qq && apt-get install -y --no-install-recommends nodejs npm && \
-    rm -rf /var/lib/apt/lists/*
 
 # Copy the HN summarizer skill
 COPY samples/copilot_container/example/hackernews/skills/ /app/foundry/skills/

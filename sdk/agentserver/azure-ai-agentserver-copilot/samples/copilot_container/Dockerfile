@@ -3,6 +3,10 @@ FROM python:3.12-slim
 # Ensure Python output is sent straight to the container logs (no buffering)
 ENV PYTHONUNBUFFERED=1
 
+# Install Node.js for the MCP server (npx requires it)
+RUN apt-get update -qq && apt-get install -y --no-install-recommends nodejs npm && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy the package source and install it with all dependencies

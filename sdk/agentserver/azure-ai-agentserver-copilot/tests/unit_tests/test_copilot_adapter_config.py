@@ -134,3 +134,114 @@ class TestTokenRefresh:
 
         config = adapter._refresh_token_if_needed()
         assert config == {"model": "gpt-5"}
+
+
+@pytest.mark.unit
+class TestSystemMessage:
+    """Tests for system message resolution in CopilotAdapter."""
+
+    @patch("azure.ai.agentserver.copilot.copilot_adapter._build_session_config")
+    def test_string_system_message(self, mock_build):
+        """A plain string is treated as append mode."""
+        mock_build.return_value = {"model": "gpt-5"}
+
+        from azure.ai.agentserver.copilot.copilot_adapter import CopilotAdapter
+
+        adapter = CopilotAdapter(system_message="You are a helpful coding assistant.")
+
+        sm = adapter._session_config.get("system_message")
+        assert sm is not None
+        assert sm["mode"] == "append"
+        assert sm["content"] == "You are a helpful coding assistant."
+
+    @patch("azure.ai.agentserver.copilot.copilot_adapter._build_session_config")
+    def test_dict_system_message_replace(self, mock_build):
+        """A SystemMessageConfig dict with replace mode is used as-is."""
+        mock_build.return_value = {"model": "gpt-5"}
+
+        from azure.ai.agentserver.copilot.copilot_adapter import CopilotAdapter
+
+        sm_config = {"mode": "replace", "content": "Custom system prompt."}
+        adapter = CopilotAdapter(system_message=sm_config)
+
+        sm = adapter._session_config.get("system_message")
+        assert sm is not None
+        assert sm["mode"] == "replace"
+        assert sm["content"] == "Custom system prompt."
+
+    @patch("azure.ai.agentserver.copilot.copilot_adapter._build_session_config")
+    def test_env_var_system_message(self, mock_build):
+        """COPILOT_SYSTEM_MESSAGE env var is used when no explicit param is given."""
+        mock_build.return_value = {"model": "gpt-5"}
+
+        with patch.dict(os.environ, {"COPILOT_SYSTEM_MESSAGE": "Env system prompt."}, clear=False):
+            from azure.ai.agentserver.copilot.copilot_adapter import CopilotAdapter
+
+            adapter = CopilotAdapter()
+
+        sm = adapter._session_config.get("system_message")
+        assert sm is not None
+        assert sm["mode"] == "append"
+        assert sm["content"] == "Env system prompt."
+
+    @patch("azure.ai.agentserver.copilot.copilot_adapter._build_session_config")
+    def test_explicit_param_overrides_env_var(self, mock_build):
+        """Explicit system_message parameter takes priority over env var."""
+        mock_build.return_value = {"model": "gpt-5"}
+
+        with patch.dict(os.environ, {"COPILOT_SYSTEM_MESSAGE": "From env."}, clear=False):
+            from azure.ai.agentserver.copilot.copilot_adapter import CopilotAdapter
+
+            adapter = CopilotAdapter(system_message="From param.")
+
+        sm = adapter._session_config.get("system_message")
+        assert sm["content"] == "From param."
+
+    @patch("azure.ai.agentserver.copilot.copilot_adapter._build_session_config")
+    def test_no_system_message(self, mock_build):
+        """Without any system message, the config has no system_message key."""
+        mock_build.return_value = {"model": "gpt-5"}
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("COPILOT_SYSTEM_MESSAGE", None)
+
+            from azure.ai.agentserver.copilot.copilot_adapter import CopilotAdapter
+
+            adapter = CopilotAdapter()
+
+        assert "system_message" not in adapter._session_config
+
+    @patch("azure.ai.agentserver.copilot.copilot_adapter._build_session_config")
+    def test_session_config_system_message_preserved(self, mock_build):
+        """system_message inside session_config is preserved when no explicit param."""
+        mock_build.return_value = {"model": "gpt-5"}
+        sc = {"system_message": {"mode": "replace", "content": "From session config."}}
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("COPILOT_SYSTEM_MESSAGE", None)
+
+            from azure.ai.agentserver.copilot.copilot_adapter import CopilotAdapter
+
+            adapter = CopilotAdapter(session_config=sc)
+
+        sm = adapter._session_config.get("system_message")
+        assert sm is not None
+        assert sm["mode"] == "replace"
+        assert sm["content"] == "From session config."
+
+    @patch("azure.ai.agentserver.copilot.copilot_adapter._build_session_config")
+    def test_explicit_param_overrides_session_config(self, mock_build):
+        """Explicit system_message parameter takes priority over session_config."""
+        mock_build.return_value = {"model": "gpt-5"}
+        sc = {"system_message": {"mode": "replace", "content": "From session config."}}
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("COPILOT_SYSTEM_MESSAGE", None)
+
+            from azure.ai.agentserver.copilot.copilot_adapter import CopilotAdapter
+
+            adapter = CopilotAdapter(session_config=sc, system_message="Override.")
+
+        sm = adapter._session_config.get("system_message")
+        assert sm["mode"] == "append"
+        assert sm["content"] == "Override."

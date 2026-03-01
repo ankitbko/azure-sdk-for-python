@@ -7,11 +7,11 @@ import dataclasses
 import json
 import os
 import uuid
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional, Union, cast
 
 from copilot import CopilotClient, MessageOptions, ProviderConfig, SessionConfig
 from copilot.generated.session_events import SessionEventType
-from copilot.types import PermissionRequest, PermissionRequestResult, ResumeSessionConfig
+from copilot.types import PermissionRequest, PermissionRequestResult, ResumeSessionConfig, SystemMessageAppendConfig, SystemMessageConfig
 from opentelemetry import context as otel_context, trace
 
 from azure.ai.agentserver.core.constants import Constants
@@ -117,12 +117,18 @@ class CopilotAdapter(FoundryCBAgent):
     :param session_config: Override for the Copilot session config.  When
         *None* the config is built automatically from environment variables.
     :type session_config: Optional[SessionConfig]
+    :param system_message: System message for the Copilot session.  A plain
+        string is treated as append mode.  A ``SystemMessageConfig`` dict
+        gives full control (``"append"`` or ``"replace"``).  Takes priority
+        over ``COPILOT_SYSTEM_MESSAGE`` env var and ``session_config``.
+    :type system_message: Optional[str | SystemMessageConfig]
     """
 
     def __init__(
         self,
         session_config: Optional[SessionConfig] = None,
         acl: Optional[ToolAcl] = None,
+        system_message: Optional[Union[str, SystemMessageConfig]] = None,
     ):
         super().__init__()
 
@@ -157,6 +163,25 @@ class CopilotAdapter(FoundryCBAgent):
             self._session_config = SessionConfig(**merged)  # type: ignore[arg-type]
         else:
             self._session_config = default_config
+
+        # System message resolution — priority order:
+        # 1. Explicit system_message parameter
+        # 2. COPILOT_SYSTEM_MESSAGE env var (append mode)
+        # 3. system_message key inside session_config (already merged above)
+        resolved_sm: Optional[SystemMessageConfig] = None
+        if system_message is not None:
+            resolved_sm = (
+                SystemMessageAppendConfig(mode="append", content=system_message)
+                if isinstance(system_message, str)
+                else system_message
+            )
+        else:
+            env_sm = os.getenv("COPILOT_SYSTEM_MESSAGE")
+            if env_sm:
+                resolved_sm = SystemMessageAppendConfig(mode="append", content=env_sm)
+
+        if resolved_sm is not None:
+            self._session_config["system_message"] = resolved_sm
 
         self._client: Optional[CopilotClient] = None
         self._credential = None

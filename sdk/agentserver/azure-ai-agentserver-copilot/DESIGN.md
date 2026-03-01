@@ -156,6 +156,39 @@ a `response.completed` event to prevent the client from hanging.
 
 In the normal case (completion already emitted), this event is a no-op.
 
+#### All other events → JSON delta forwarding
+
+Copilot SDK events that have no direct RAPI equivalent (tool execution,
+sub-agent delegation, reasoning, session lifecycle, hooks, etc.) are
+serialized as JSON and emitted as `response.output_text.delta` events.
+
+The JSON payload format is:
+
+```json
+{"copilot_event": "EVENT_TYPE_NAME", "data": {...}}
+```
+
+The client can identify these by checking for the `copilot_event` key in
+the delta text and render appropriate UI (tool progress indicators,
+reasoning chains, sub-agent status, etc.).
+
+**Key properties:**
+- The JSON is **not** accumulated into `_accumulated_text` — it does not
+  appear in `response.output_text.done` or `response.completed`
+- `None` values are filtered from the data dict for cleanliness
+- Sequence numbers are shared with regular RAPI events (monotonically
+  increasing across the entire response)
+
+**Forwarded event types include:**
+- `TOOL_EXECUTION_START`, `TOOL_EXECUTION_COMPLETE`, `TOOL_EXECUTION_PROGRESS`,
+  `TOOL_EXECUTION_PARTIAL_RESULT`, `TOOL_USER_REQUESTED`
+- `SUBAGENT_SELECTED`, `SUBAGENT_STARTED`, `SUBAGENT_COMPLETED`, `SUBAGENT_FAILED`
+- `ASSISTANT_REASONING`, `ASSISTANT_REASONING_DELTA`, `ASSISTANT_INTENT`
+- `SESSION_MODEL_CHANGE`, `SESSION_MODE_CHANGED`, `SESSION_TITLE_CHANGED`,
+  `SESSION_PLAN_CHANGED`, `SESSION_CONTEXT_CHANGED`
+- `HOOK_START`, `HOOK_END`, `SKILL_INVOKED`
+- Any other unrecognised event types
+
 ## Non-streaming Mode
 
 When the client requests a non-streaming response, the adapter iterates over

@@ -3,6 +3,7 @@
 # ---------------------------------------------------------
 """Unit tests for CopilotStreamingResponseConverter."""
 import datetime
+import json
 import uuid
 from unittest.mock import MagicMock
 
@@ -516,3 +517,181 @@ class TestFullEventSequence:
             "response.completed",
         ]
         assert types == expected
+
+
+# ---------------------------------------------------------------------------
+# Copilot event forwarding (gap events → JSON deltas)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestCopilotEventForwarding:
+    """Tests for forwarding gap events as JSON text deltas."""
+
+    def test_tool_execution_start_emits_delta(self):
+        """TOOL_EXECUTION_START should emit a ResponseTextDeltaEvent with JSON payload."""
+        context = _make_context()
+        converter = CopilotStreamingResponseConverter(context)
+        # Open a turn so we have an active item
+        list(converter._convert_event(_make_event(SessionEventType.ASSISTANT_TURN_START), context))
+        events = list(converter._convert_event(
+            _make_event(SessionEventType.TOOL_EXECUTION_START, tool_name="shell", tool_call_id="tc_1"), context
+        ))
+        assert len(events) == 1
+        assert isinstance(events[0], ResponseTextDeltaEvent)
+        payload = json.loads(events[0].get("delta"))
+        assert payload["copilot_event"] == "TOOL_EXECUTION_START"
+        assert payload["data"]["tool_name"] == "shell"
+        assert payload["data"]["tool_call_id"] == "tc_1"
+
+    def test_tool_execution_complete_emits_delta(self):
+        """TOOL_EXECUTION_COMPLETE should emit a ResponseTextDeltaEvent with JSON payload."""
+        context = _make_context()
+        converter = CopilotStreamingResponseConverter(context)
+        list(converter._convert_event(_make_event(SessionEventType.ASSISTANT_TURN_START), context))
+        events = list(converter._convert_event(
+            _make_event(SessionEventType.TOOL_EXECUTION_COMPLETE, tool_name="shell", tool_call_id="tc_1"), context
+        ))
+        assert len(events) == 1
+        assert isinstance(events[0], ResponseTextDeltaEvent)
+        payload = json.loads(events[0].get("delta"))
+        assert payload["copilot_event"] == "TOOL_EXECUTION_COMPLETE"
+
+    def test_tool_execution_progress_emits_delta(self):
+        """TOOL_EXECUTION_PROGRESS should emit a ResponseTextDeltaEvent."""
+        context = _make_context()
+        converter = CopilotStreamingResponseConverter(context)
+        list(converter._convert_event(_make_event(SessionEventType.ASSISTANT_TURN_START), context))
+        events = list(converter._convert_event(
+            _make_event(SessionEventType.TOOL_EXECUTION_PROGRESS, progress_message="Searching..."), context
+        ))
+        assert len(events) == 1
+        payload = json.loads(events[0].get("delta"))
+        assert payload["copilot_event"] == "TOOL_EXECUTION_PROGRESS"
+        assert payload["data"]["progress_message"] == "Searching..."
+
+    def test_assistant_reasoning_emits_delta(self):
+        """ASSISTANT_REASONING should emit a ResponseTextDeltaEvent with reasoning content."""
+        context = _make_context()
+        converter = CopilotStreamingResponseConverter(context)
+        list(converter._convert_event(_make_event(SessionEventType.ASSISTANT_TURN_START), context))
+        events = list(converter._convert_event(
+            _make_event(SessionEventType.ASSISTANT_REASONING, content="Let me think about this..."), context
+        ))
+        assert len(events) == 1
+        assert isinstance(events[0], ResponseTextDeltaEvent)
+        payload = json.loads(events[0].get("delta"))
+        assert payload["copilot_event"] == "ASSISTANT_REASONING"
+        assert payload["data"]["content"] == "Let me think about this..."
+
+    def test_subagent_selected_emits_delta(self):
+        """SUBAGENT_SELECTED should emit a ResponseTextDeltaEvent."""
+        context = _make_context()
+        converter = CopilotStreamingResponseConverter(context)
+        list(converter._convert_event(_make_event(SessionEventType.ASSISTANT_TURN_START), context))
+        events = list(converter._convert_event(
+            _make_event(SessionEventType.SUBAGENT_SELECTED, agent_name="code-search"), context
+        ))
+        assert len(events) == 1
+        payload = json.loads(events[0].get("delta"))
+        assert payload["copilot_event"] == "SUBAGENT_SELECTED"
+        assert payload["data"]["agent_name"] == "code-search"
+
+    def test_session_model_change_emits_delta(self):
+        """SESSION_MODEL_CHANGE should emit a ResponseTextDeltaEvent."""
+        context = _make_context()
+        converter = CopilotStreamingResponseConverter(context)
+        list(converter._convert_event(_make_event(SessionEventType.ASSISTANT_TURN_START), context))
+        events = list(converter._convert_event(
+            _make_event(SessionEventType.SESSION_MODEL_CHANGE, new_model="o3", previous_model="gpt-4"), context
+        ))
+        assert len(events) == 1
+        payload = json.loads(events[0].get("delta"))
+        assert payload["copilot_event"] == "SESSION_MODEL_CHANGE"
+        assert payload["data"]["new_model"] == "o3"
+        assert payload["data"]["previous_model"] == "gpt-4"
+
+    def test_event_json_not_accumulated(self):
+        """Gap event JSON must NOT be accumulated into _accumulated_text."""
+        context = _make_context()
+        converter = CopilotStreamingResponseConverter(context)
+        list(converter._convert_event(_make_event(SessionEventType.ASSISTANT_TURN_START), context))
+        list(converter._convert_event(
+            _make_event(SessionEventType.TOOL_EXECUTION_START, tool_name="shell"), context
+        ))
+        assert converter._accumulated_text == ""
+
+    def test_event_data_none_values_filtered(self):
+        """None values in event data should be filtered out of the JSON."""
+        context = _make_context()
+        converter = CopilotStreamingResponseConverter(context)
+        list(converter._convert_event(_make_event(SessionEventType.ASSISTANT_TURN_START), context))
+        events = list(converter._convert_event(
+            _make_event(SessionEventType.TOOL_EXECUTION_START, tool_name="shell"), context
+        ))
+        payload = json.loads(events[0].get("delta"))
+        # tool_call_id is None and should not appear in data
+        assert "tool_call_id" not in payload["data"]
+
+    def test_gap_events_preserve_sequence_numbers(self):
+        """Gap event deltas must have proper sequence numbers."""
+        context = _make_context()
+        converter = CopilotStreamingResponseConverter(context)
+        all_events = []
+        all_events.extend(converter._convert_event(
+            _make_event(SessionEventType.ASSISTANT_TURN_START), context
+        ))
+        all_events.extend(converter._convert_event(
+            _make_event(SessionEventType.TOOL_EXECUTION_START, tool_name="shell"), context
+        ))
+        all_events.extend(converter._convert_event(
+            _make_event(SessionEventType.TOOL_EXECUTION_COMPLETE, tool_name="shell"), context
+        ))
+        seq_numbers = [e.get("sequence_number") for e in all_events]
+        for i in range(1, len(seq_numbers)):
+            assert seq_numbers[i] == seq_numbers[i - 1] + 1
+
+    def test_gap_events_in_multi_turn_flow(self):
+        """Gap events between turns should produce JSON deltas."""
+        context = _make_context()
+        converter = CopilotStreamingResponseConverter(context)
+        events = []
+        # Turn 1: tool-calling
+        events.extend(converter._convert_event(
+            _make_event(SessionEventType.ASSISTANT_TURN_START), context))
+        events.extend(converter._convert_event(
+            _make_event(SessionEventType.ASSISTANT_TURN_END), context))
+        # Tool execution between turns
+        events.extend(converter._convert_event(
+            _make_event(SessionEventType.TOOL_EXECUTION_START, tool_name="grep"), context))
+        events.extend(converter._convert_event(
+            _make_event(SessionEventType.TOOL_EXECUTION_COMPLETE, tool_name="grep"), context))
+        # Turn 2: final answer
+        events.extend(converter._convert_event(
+            _make_event(SessionEventType.ASSISTANT_TURN_START), context))
+        events.extend(converter._convert_event(
+            _make_event(SessionEventType.ASSISTANT_MESSAGE, "Found it!"), context))
+        events.extend(converter._convert_event(
+            _make_event(SessionEventType.ASSISTANT_TURN_END), context))
+
+        # Check tool events are present as JSON deltas
+        tool_deltas = [
+            e for e in events
+            if isinstance(e, ResponseTextDeltaEvent)
+            and e.get("delta", "").startswith('{"copilot_event"')
+        ]
+        assert len(tool_deltas) == 2
+        assert json.loads(tool_deltas[0].get("delta"))["copilot_event"] == "TOOL_EXECUTION_START"
+        assert json.loads(tool_deltas[1].get("delta"))["copilot_event"] == "TOOL_EXECUTION_COMPLETE"
+
+    def test_existing_text_deltas_unchanged(self):
+        """Regular text deltas should not be affected by gap event forwarding."""
+        events, _ = _run_streaming_turn(_make_context(), ["Hello, ", "world!"], "Hello, world!")
+        text_deltas = [
+            e for e in events
+            if isinstance(e, ResponseTextDeltaEvent)
+            and not e.get("delta", "").startswith('{"copilot_event"')
+        ]
+        assert len(text_deltas) == 2
+        assert text_deltas[0].get("delta") == "Hello, "
+        assert text_deltas[1].get("delta") == "world!"

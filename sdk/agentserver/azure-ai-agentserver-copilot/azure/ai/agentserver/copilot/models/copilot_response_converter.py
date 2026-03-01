@@ -1,7 +1,9 @@
 # ---------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # ---------------------------------------------------------
+import dataclasses
 import datetime
+import json
 import time
 from typing import Any, Dict, Generator, Optional
 
@@ -338,15 +340,65 @@ class CopilotStreamingResponseConverter:
                     )
                     self._completed = True
 
-            # ── Reasoning ─────────────────────────────────────────────────────
+            # ── Reasoning (forwarded as JSON + logged) ─────────────────────
             case SessionEvent(type=SessionEventType.ASSISTANT_REASONING, data=data):
                 if data and data.content:
                     logger.debug(f"Copilot reasoning: {data.content[:120]!r}")
+                yield from self._emit_copilot_event_as_delta(event)
 
-            # ── All other events ──────────────────────────────────────────────
+            # ── All other events (gap events forwarded as JSON) ───────────
             case _:
                 ename = event.type.name if event.type else "UNKNOWN"
-                logger.debug(f"Unhandled Copilot event: {ename}")
+                logger.debug(f"Forwarding Copilot event as JSON: {ename}")
+                yield from self._emit_copilot_event_as_delta(event)
+
+    # ------------------------------------------------------------------
+    # Copilot event forwarding (gap events → JSON deltas)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _serialize_event_data(data: Any) -> Dict[str, Any]:
+        """Serialize Copilot event data to a JSON-compatible dict.
+
+        Uses ``dataclasses.asdict`` for dataclass instances, filtering out
+        None values for cleanliness.  Falls back to ``repr()`` if serialization
+        fails.
+        """
+        if data is None:
+            return {}
+        try:
+            raw = dataclasses.asdict(data)
+            return {k: v for k, v in raw.items() if v is not None}
+        except Exception:
+            return {"raw": repr(data)}
+
+    def _emit_copilot_event_as_delta(
+        self, event: SessionEvent,
+    ) -> Generator[ResponseStreamEvent, None, None]:
+        """Serialize a Copilot event as JSON and emit as a ``response.output_text.delta``.
+
+        Gap events (those without RAPI equivalents) are forwarded to the client
+        as JSON-encoded text deltas.  The payload format is::
+
+            {"copilot_event": "EVENT_TYPE_NAME", "data": {...}}
+
+        The client can identify these by checking for the ``copilot_event`` key
+        and render appropriate UI (tool progress, reasoning, sub-agent status, etc.).
+
+        The JSON text is **not** accumulated into ``_accumulated_text`` so it does
+        not appear in ``response.output_text.done`` or ``response.completed``.
+        """
+        event_name = event.type.name if event.type else "UNKNOWN"
+        event_data = self._serialize_event_data(event.data)
+        payload = json.dumps({"copilot_event": event_name, "data": event_data})
+
+        yield ResponseTextDeltaEvent(
+            sequence_number=self.next_sequence(),
+            item_id=self._item_id,
+            output_index=0,
+            content_index=0,
+            delta=payload,
+        )
 
     # ------------------------------------------------------------------
     # Legacy shim kept for any existing call sites

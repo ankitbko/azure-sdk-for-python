@@ -42,6 +42,7 @@ YOU MUST ALWAYS USE nohup with & and redirect output to /vscode/vscode-tunnel.lo
 ### 3a — Login with the chosen provider
 
 First, run the user login command with nohup to authenticate with the provider the user chose in step 2. This must complete before starting the tunnel.
+If you decide not to use nohup then YOU MUST RUN the commands in detach mode since these could br long running tasks.
 
 For GitHub:
 
@@ -54,6 +55,8 @@ For Microsoft:
 ```bash (detach = true)
 nohup /vscode/code tunnel user login --provider microsoft > /vscode/vscode-tunnel.log 2>&1 &
 ```
+
+Remember: If use completes the login then the command will silently exit with code 0, so you may not find your bash process running. This is expected. Always check the log file of this tool call for the login result.
 
 Poll the log file to get the device code:
 

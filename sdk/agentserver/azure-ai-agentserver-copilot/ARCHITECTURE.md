@@ -108,40 +108,33 @@ rules:
 
 ### 3. Session Management
 
-The adapter maintains **persistent Copilot sessions** for multi-turn
-conversations.  This preserves context (memory, tool state, conversation
-history) across multiple requests.
+The adapter maintains a **single persistent Copilot session** that is reused
+across all requests.  This preserves context (memory, tool state, conversation
+history) across multiple turns.
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant Adapter
-    participant SessionCache
     participant CopilotSDK
 
-    Client->>Adapter: Request 1 (conversation_id: "abc123")
-    Adapter->>SessionCache: lookup("abc123")
-    SessionCache-->>Adapter: not found
+    Client->>Adapter: Request 1
     Adapter->>CopilotSDK: create_session()
-    Adapter->>SessionCache: cache("abc123", session)
+    Note over Adapter: Session stored
     Adapter-->>Client: Response
 
-    Client->>Adapter: Request 2 (conversation_id: "abc123")
-    Adapter->>SessionCache: lookup("abc123")
-    SessionCache-->>Adapter: cached session
-    Note over Adapter: Context preserved
-    Adapter-->>Client: Response
+    Client->>Adapter: Request 2
+    Note over Adapter: Reuse existing session
+    Adapter-->>Client: Response (context preserved)
 
-    Client->>Adapter: Request 3 (conversation_id: "xyz789")
-    Adapter->>SessionCache: lookup("xyz789")
-    SessionCache-->>Adapter: not found
-    Adapter->>CopilotSDK: create_session()
-    Adapter->>SessionCache: cache("xyz789", session)
-    Adapter-->>Client: Response
+    Client->>Adapter: Request 3
+    Note over Adapter: Reuse existing session
+    Adapter-->>Client: Response (context preserved)
 ```
 
-Session mapping is keyed by the `conversation_id` from the RAPI request.
-Sessions without a conversation ID are ephemeral (not cached).
+The session is created lazily on the first request and reused for the
+lifetime of the adapter process.  This means all conversation history,
+tool state, and skill context are preserved across turns.
 
 ### 4. Response Conversion
 

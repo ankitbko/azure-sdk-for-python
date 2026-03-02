@@ -238,10 +238,11 @@ length, with full data payloads available at DEBUG level.
 
 ## Session Reuse
 
-For multi-turn conversations, the adapter caches Copilot sessions keyed by
-conversation ID.  Subsequent messages in the same conversation reuse the
-existing session, preserving context.  The event listener is unsubscribed
-after each message exchange to prevent stale listener accumulation.
+The adapter maintains a single persistent Copilot session that is created
+lazily on the first request and reused for all subsequent requests.  This
+preserves full conversation context, tool state, and skill memory across
+turns.  The event listener is unsubscribed after each message exchange to
+prevent stale listener accumulation.
 
 ---
 

@@ -199,8 +199,8 @@ class CopilotAdapter(FoundryCBAgent):
                     "Set TOOL_ACL_PATH to a YAML ACL file for production use."
                 )
 
-        # Multi-turn: map conversation_id → live CopilotSession
-        self._sessions: Dict[str, Any] = {}
+        # Single persistent Copilot session — reused across all requests.
+        self._session: Any = None
 
         # Keep credential for token refresh when using Foundry with Managed Identity
         if os.getenv("AZURE_AI_FOUNDRY_RESOURCE_URL") and not os.getenv("AZURE_AI_FOUNDRY_API_KEY"):
@@ -263,20 +263,16 @@ class CopilotAdapter(FoundryCBAgent):
                 )
 
         conversation_id = context.conversation_id
-        session = self._sessions.get(conversation_id) if conversation_id else None
+        session = self._session
 
         if session is None:
-            logger.info(
-                f"Creating new Copilot session"
-                + (f" for conversation {conversation_id!r}" if conversation_id else "")
-            )
+            logger.info("Creating Copilot session")
             session_config = SessionConfig(**config, on_permission_request=_on_permission, streaming=context.stream)
             session = await client.create_session(session_config)
-            if conversation_id:
-                self._sessions[conversation_id] = session
-                logger.debug(f"Cached session {session.session_id!r} under conversation {conversation_id!r}")
+            self._session = session
+            logger.info(f"Copilot session {session.session_id!r} created")
         else:
-            logger.info(f"Reusing Copilot session {session.session_id!r} for conversation turn (conversation={conversation_id!r})")
+            logger.info(f"Reusing Copilot session {session.session_id!r}")
 
         tracer = self.tracer or trace.get_tracer(__name__)
         agent_name = self.get_agent_identifier()

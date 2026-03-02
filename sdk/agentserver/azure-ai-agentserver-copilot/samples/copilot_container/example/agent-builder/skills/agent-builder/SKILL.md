@@ -33,8 +33,7 @@ When a user describes the agent they want to build:
 
    This scaffolds the project in the current directory with skills/ and mcp.json.
 
-4. **Customize skills** — Edit the SKILL.md file inside skills/<skill-name>/ to match
-   the user's requirements. You can create multiple skill directories. Each needs a SKILL.md.
+4. **Customize skills** — Edit the SKILL.md file inside skills/<skill-name>/ to match the user's requirements. You can create multiple skill directories. Each needs a SKILL.md. You can delete the existing ones.
 
 5. **Customize MCP servers** — Edit mcp.json to add the MCP servers the agent needs.
    Format (local mcp):
@@ -75,7 +74,9 @@ When a user describes the agent they want to build:
    - `COPILOT_MODEL` — the model to use (default: claude-opus-4.6)
    - `COPILOT_SYSTEM_MESSAGE` - the system message that defines the agent's identity and behavior. When user asks the agent what it can do, respond with the content of this variable.
 
-7. **Deploy** — Run:
+7. **Update the Dockerfile**: Ensure the Dockerfile is correct and it correctly coopies the SKILL.md files and mcp.json into the image. The base image should not be updated. RUN command is also important to ensure MCP servers are installed.
+
+8. **Deploy** — Run:
 
    ```
    cd /tmp && fa deploy --acr $ACR_NAME
@@ -88,7 +89,7 @@ When a user describes the agent they want to build:
    FOUNDRY_HOSTED_AGENT_URL: <playground-url>
    ```
 
-8. **Test** — Run:
+9. **Test** — Run:
    ```
    cd /tmp && fa invoke --remote "<test-message>"
    ```
@@ -109,10 +110,9 @@ When a user describes the agent they want to build:
 
 Common MCP servers users might need:
 
-| Use Case     | Package                                   | Command                                                     |
-| ------------ | ----------------------------------------- | ----------------------------------------------------------- |
-| Hacker News  | mcp-hacker-news                           | `npx -y mcp-hacker-news`                                    |
-| GitHub       | @modelcontextprotocol/server-github       | `npx -y @modelcontextprotocol/server-github`                |
-| Filesystem   | @modelcontextprotocol/server-filesystem   | `npx -y @modelcontextprotocol/server-filesystem /tmp`       |
-| SQLite       | @modelcontextprotocol/server-sqlite       | `npx -y @modelcontextprotocol/server-sqlite /tmp/db.sqlite` |
-| Brave Search | @modelcontextprotocol/server-brave-search | `npx -y @modelcontextprotocol/server-brave-search`          |
+| Use Case    | Package                                 | Command                                                     |
+| ----------- | --------------------------------------- | ----------------------------------------------------------- |
+| Hacker News | mcp-hacker-news                         | `npx -y mcp-hacker-news`                                    |
+| GitHub      | @modelcontextprotocol/server-github     | `npx -y @modelcontextprotocol/server-github`                |
+| Filesystem  | @modelcontextprotocol/server-filesystem | `npx -y @modelcontextprotocol/server-filesystem /tmp`       |
+| SQLite      | @modelcontextprotocol/server-sqlite     | `npx -y @modelcontextprotocol/server-sqlite /tmp/db.sqlite` |

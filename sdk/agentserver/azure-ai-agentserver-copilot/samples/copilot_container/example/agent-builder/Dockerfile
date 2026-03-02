@@ -13,7 +13,7 @@
 #     -e COPILOT_MODEL=claude-opus-4.6 \
 #     agent-builder
 
-ARG BASE_IMAGE=acrhostedagentbugbash.azurecr.io/ghcp-adapter:vnext-1
+ARG BASE_IMAGE=acrhostedagentbugbash.azurecr.io/ghcp-adapter:vnext-2
 FROM ${BASE_IMAGE}
 
 # Install fa CLI from pre-built wheel (private repo — not published to PyPI)
@@ -27,6 +27,12 @@ RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends curl ca-certificates gnupg lsb-release && \
     curl -sL https://aka.ms/InstallAzureCLIDeb | bash && \
     rm -rf /var/lib/apt/lists/*
+
+# Patch Azure CLI ACR module to respect AZURE_CLI_DISABLE_CONNECTION_VERIFICATION
+# when uploading build context and streaming logs via BlobClient.
+# Without this, `az acr build` fails with SSL errors behind a TLS-intercepting proxy.
+COPY fix_acr_ssl.py /tmp/
+RUN python3 /tmp/fix_acr_ssl.py && rm /tmp/fix_acr_ssl.py
 
 # Copy skills
 COPY skills/ /app/foundry/skills/

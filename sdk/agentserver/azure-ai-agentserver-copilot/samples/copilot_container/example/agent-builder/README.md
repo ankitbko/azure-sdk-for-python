@@ -49,7 +49,7 @@ rm samples/copilot_container/example/agent-builder/*.whl
 
 ```bash
 docker run -p 8088:8088 \
-  -e COPILOT_GITHUB_TOKEN=<github-pat> \
+  -e GH_TOKEN=<github-pat> \
   -e COPILOT_MODEL=claude-opus-4.6 \
   agent-builder:latest
 ```
@@ -67,7 +67,7 @@ After pushing to ACR, create a hosted agent with these settings:
 | vNext | `enableVnextExperience: true` |
 
 Required environment variables:
-- `COPILOT_GITHUB_TOKEN` — GitHub PAT with Copilot scope
+- `GH_TOKEN` — GitHub PAT with Copilot scope
 - `COPILOT_MODEL` — e.g. `claude-opus-4.6`
 - `ACR_NAME` — ACR registry name where child agent images are pushed (e.g. `acrhostedagentbugbash`)
 - `FOUNDRY_PROJECT_URL` — Foundry project endpoint where child agents are deployed (e.g. `https://<account>.services.ai.azure.com/api/projects/<project>`)
@@ -80,7 +80,7 @@ When a user asks to build an agent, it:
 1. Runs `fa init --name <name> -t ghcp` to scaffold in `/tmp/<name>/`
 2. Edits `skills/<name>/SKILL.md` with the user's instructions
 3. Edits `mcp.json` if the agent needs MCP tool servers
-4. Sets `COPILOT_GITHUB_TOKEN` in `.env` from its own environment (never asks the user)
+4. Sets `GH_TOKEN` in `.env` from its own environment (never asks the user)
 5. Runs `fa deploy` to build and deploy to Foundry
 6. Reports `FOUNDRY_HOSTED_AGENT_URL: <playground-url>` to the user
 7. Tests with `fa invoke --remote "<message>"`

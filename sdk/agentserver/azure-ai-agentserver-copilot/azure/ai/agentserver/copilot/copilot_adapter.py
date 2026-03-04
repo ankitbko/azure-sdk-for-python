@@ -137,11 +137,12 @@ class CopilotAdapter(FoundryCBAgent):
         # uvicorn's configure_logging() calls dictConfig() which resets
         # loggers and clears any filters we add before the server starts.
         # Startup events fire AFTER uvicorn's logging is configured.
-        @self.app.on_event("startup")
-        async def _suppress_health_check_logs():
-            _hc_filter = _HealthCheckFilter()
-            for _name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
-                _logging.getLogger(_name).addFilter(_hc_filter)
+        if hasattr(self.app, "on_event"):
+            @self.app.on_event("startup")
+            async def _suppress_health_check_logs():
+                _hc_filter = _HealthCheckFilter()
+                for _name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+                    _logging.getLogger(_name).addFilter(_hc_filter)
 
         # Build default config (handles provider setup from env vars)
         default_config = _build_session_config()
@@ -225,9 +226,17 @@ class CopilotAdapter(FoundryCBAgent):
             if github_token:
                 client_opts["github_token"] = github_token
                 logger.info("Using explicit GitHub token for Copilot authentication")
-            self._client = CopilotClient(client_opts if client_opts else None)
+            log_level = os.getenv("COPILOT_LOG_LEVEL", "info")
+            client_opts["log_level"] = log_level
+            cli_args: list = ["--experimental"]
+            log_dir = os.getenv("COPILOT_LOG_DIR")
+            if log_dir:
+                cli_args.extend(["--log-dir", log_dir])
+                logger.info(f"Copilot CLI log directory: {log_dir}")
+            client_opts["cli_args"] = cli_args
+            self._client = CopilotClient(client_opts)
             await self._client.start()
-            logger.info("CopilotClient started")
+            logger.info(f"CopilotClient started (log_level={log_level})")
         return self._client
 
 

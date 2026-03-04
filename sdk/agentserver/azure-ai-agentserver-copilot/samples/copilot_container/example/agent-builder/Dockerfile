@@ -13,7 +13,7 @@
 #     -e COPILOT_MODEL=claude-opus-4.6 \
 #     agent-builder
 
-ARG BASE_IMAGE=acrhostedagentbugbash.azurecr.io/ghcp-adapter:vnext-3
+ARG BASE_IMAGE=acrhostedagentbugbash.azurecr.io/ghcp-adapter:vnext-5
 FROM ${BASE_IMAGE}
 
 # Install fa CLI from pre-built wheel (private repo — not published to PyPI)

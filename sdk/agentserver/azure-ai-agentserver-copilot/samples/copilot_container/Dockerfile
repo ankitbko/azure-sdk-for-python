@@ -16,6 +16,14 @@ RUN pip install --no-cache-dir ./package/ azure-identity "github-copilot-sdk>=0.
 # Create the well-known directories for user content
 RUN mkdir -p /app/foundry/skills
 
+# Enable Copilot CLI staff mode to unlock the SKILLS_INSTRUCTIONS feature flag.
+# Without this, skill directories are discovered but the full SKILL.md content
+# is NOT injected into the model context — only the short description from the
+# YAML frontmatter is visible.  This is a server-side feature flag gated behind
+# staff mode; see ARCHITECTURE.md for details.
+RUN mkdir -p /root/.copilot && \
+    echo '{"staff": true}' > /root/.copilot/config.json
+
 # Copy the base entrypoint, default ACL, and MCP package installer
 COPY samples/copilot_container/main.py main.py
 COPY samples/copilot_container/tools_acl.yaml tools_acl.yaml

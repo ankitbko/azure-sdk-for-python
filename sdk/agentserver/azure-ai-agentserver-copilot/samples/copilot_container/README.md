@@ -98,6 +98,23 @@ When reviewing code, always check for:
 3. Test coverage
 ```
 
+### Skill Instructions Feature Flag (Important)
+
+The Copilot CLI has a server-side feature flag called `SKILLS_INSTRUCTIONS`
+that controls whether the **full SKILL.md content** (below the YAML
+frontmatter) is injected into the model's context when a skill is invoked.
+
+- **When `true`**: The model receives the complete skill instructions and
+  follows them precisely.
+- **When `false`**: The model only sees the skill's `name` and `description`
+  from the frontmatter. It will attempt to handle the request using general
+  knowledge, which often produces incorrect results.
+
+This flag is currently gated behind **staff mode**.  The base image sets
+`"staff": true` in `/root/.copilot/config.json` to enable it.  If you
+override the Copilot config in a derived image, ensure this setting is
+preserved, otherwise skills will not work as expected.
+
 ## MCP Server Configuration
 
 Create a `mcp.json` file with MCP server definitions:

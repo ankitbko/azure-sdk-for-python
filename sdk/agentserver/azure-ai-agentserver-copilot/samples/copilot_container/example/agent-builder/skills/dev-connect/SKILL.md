@@ -5,6 +5,8 @@ description: Sets up and starts a VS Code tunnel for remote development when the
 
 # VS Code Tunnel
 
+**IMPORTANT**: You MUST run all the bash command in this skills with mode = async and detach = true. There is no exception. If you cannot run in async detached mode then break immediately and inform user you cannot proceed with the request.
+
 You are a VS Code tunnel setup assistant. When the user types `/dev`, mentions "start vscode", "open vscode", "dev environment", or similar, you MUST follow the steps below **exactly in order**. Do NOT skip steps. Do NOT proceed to the next step until the current one completes.
 
 ## Step 1 — Install the VS Code CLI
@@ -35,25 +37,25 @@ Ask the user which authentication method they want to use:
 
 Remember their choice for step 3.
 
-## Step 3 — Login and start the tunnel
+## Step 3 — Login and start the tunnel in detach mode
 
 YOU MUST ALWAYS USE nohup with & and redirect output to /vscode/vscode-tunnel.log for both login and tunnel commands. This ensures processes survive independently of the shell session.
 
-### 3a — Login with the chosen provider
+### 3a — Login with the chosen provider in detach mode
 
 First, run the user login command with nohup to authenticate with the provider the user chose in step 2. This must complete before starting the tunnel.
 If you decide not to use nohup then YOU MUST RUN the commands in detach mode since these could br long running tasks.
 
 For GitHub:
 
-```bash (detach = true)
-nohup /vscode/code tunnel user login --provider github > /vscode/vscode-tunnel.log 2>&1 &
+```bash
+/vscode/code tunnel user login --provider github > /vscode/vscode-tunnel.log
 ```
 
 For Microsoft:
 
-```bash (detach = true)
-nohup /vscode/code tunnel user login --provider microsoft > /vscode/vscode-tunnel.log 2>&1 &
+```bash
+/vscode/code tunnel user login --provider microsoft > /vscode/vscode-tunnel.log
 ```
 
 Remember: If use completes the login then the command will silently exit with code 0, so you may not find your bash process running. This is expected. Always check the log file of this tool call for the login result.
@@ -80,12 +82,12 @@ Enter code: **<CODE>**
 
 Wait for the user to confirm they completed the auth. Then verify login succeeded by reading the log file again.
 
-### 3b — Start the tunnel
+### 3b — Start the tunnel in detach mode
 
 Once login is complete, start the tunnel as a background process:
 
-```bash (detach = true)
-nohup /vscode/code tunnel --accept-server-license-terms --random-name > /vscode/vscode-tunnel.log 2>&1 &
+```bash
+/vscode/code tunnel --accept-server-license-terms --random-name > /vscode/vscode-tunnel.log
 ```
 
 Poll the log file to find the tunnel URL:

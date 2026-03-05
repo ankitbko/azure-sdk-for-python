@@ -238,11 +238,22 @@ length, with full data payloads available at DEBUG level.
 
 ## Session Reuse
 
-The adapter maintains a single persistent Copilot session that is created
-lazily on the first request and reused for all subsequent requests.  This
-preserves full conversation context, tool state, and skill memory across
-turns.  The event listener is unsubscribed after each message exchange to
-prevent stale listener accumulation.
+The adapter maintains a single persistent Copilot session that survives
+container sleep/wake cycles (e.g. Azure Dynamic Sessions micro-VMs).
+
+**Normal operation:** The in-memory session object is reused directly.
+
+**After sleep/wake:** The in-memory session is lost but the Copilot SDK
+persists state to `~/.copilot/session-state/` on disk.  On the next request
+the adapter calls `list_sessions()` to discover persisted sessions and
+`resume_session()` to restore the most recent one.  BYOK provider credentials
+are re-provided on resume since they are not persisted by the SDK.
+
+**Fallback:** If resume fails (session expired, disk cleared), a fresh session
+is created transparently.
+
+The event listener is unsubscribed after each message exchange to prevent
+stale listener accumulation.
 
 ---
 

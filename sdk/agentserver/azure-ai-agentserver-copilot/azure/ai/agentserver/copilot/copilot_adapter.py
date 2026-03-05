@@ -184,6 +184,14 @@ class CopilotAdapter(FoundryCBAgent):
         if resolved_sm is not None:
             self._session_config["system_message"] = resolved_sm
 
+        # Session state directory — controls where the Copilot CLI persists
+        # session state (conversation history, checkpoints, plans).
+        # COPILOT_SESSION_STATE_DIR env var takes priority; default is
+        # ./.copilot/session-state (relative to the CLI's working directory).
+        self._config_dir: Optional[str] = os.getenv("COPILOT_SESSION_STATE_DIR")
+        if self._config_dir:
+            logger.info(f"Session state directory: {self._config_dir}")
+
         self._client: Optional[CopilotClient] = None
         self._credential = None
 
@@ -200,7 +208,10 @@ class CopilotAdapter(FoundryCBAgent):
                     "Set TOOL_ACL_PATH to a YAML ACL file for production use."
                 )
 
-        # Single persistent Copilot session — reused across all requests.
+        # Session ID for the single persistent session.
+        # After wake-from-sleep the in-memory session object is gone but the
+        # session state is on disk.  We store only the ID and resume on demand.
+        self._session_id: Optional[str] = None
         self._session: Any = None
 
         # Keep credential for token refresh when using Foundry with Managed Identity
@@ -239,6 +250,69 @@ class CopilotAdapter(FoundryCBAgent):
             logger.info(f"CopilotClient started (log_level={log_level})")
         return self._client
 
+    async def _get_or_create_session(
+        self,
+        client: CopilotClient,
+        config: SessionConfig,
+        on_permission: Any,
+        stream: bool,
+    ) -> Any:
+        """Return the single persistent Copilot session.
+
+        On the first request a new session is created.  On subsequent requests
+        the in-memory session object is reused.  After a sleep/wake cycle the
+        in-memory object is gone but the session state is on disk; in that case
+        we discover the persisted session via ``list_sessions`` and resume it.
+        If resume fails (e.g. session was cleaned up) a fresh session is created.
+        """
+        # Fast path: in-memory session is still alive
+        if self._session is not None:
+            logger.info(f"Reusing in-memory Copilot session {self._session_id!r}")
+            return self._session
+
+        # After wake-from-sleep: try to find and resume a persisted session
+        if self._session_id is None:
+            try:
+                sessions = await client.list_sessions()
+                if sessions:
+                    self._session_id = sessions[0].sessionId
+                    logger.info(
+                        f"Found {len(sessions)} persisted session(s); "
+                        f"resuming most recent: {self._session_id!r}"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to list sessions: {e}")
+
+        if self._session_id is not None:
+            try:
+                resume_config = ResumeSessionConfig(
+                    on_permission_request=on_permission,
+                    streaming=stream,
+                )
+                # Re-provide BYOK provider credentials (not persisted by the SDK)
+                if "provider" in config:
+                    resume_config["provider"] = config["provider"]
+                if self._config_dir:
+                    resume_config["config_dir"] = self._config_dir
+                session = await client.resume_session(self._session_id, resume_config)
+                self._session = session
+                logger.info(f"Resumed Copilot session {self._session_id!r}")
+                return session
+            except Exception as e:
+                logger.warning(f"Failed to resume session {self._session_id!r}: {e}; creating new session")
+                self._session_id = None
+
+        # No persisted session found (or resume failed) — create a new one
+        logger.info("Creating new Copilot session")
+        session_config = SessionConfig(**config, on_permission_request=on_permission, streaming=stream)
+        if self._config_dir:
+            session_config["config_dir"] = self._config_dir
+        session = await client.create_session(session_config)
+        self._session = session
+        self._session_id = session.session_id
+        logger.info(f"Copilot session {self._session_id!r} created")
+        return session
+
 
     async def agent_run(self, context: AgentRunContext):
 
@@ -272,16 +346,7 @@ class CopilotAdapter(FoundryCBAgent):
                 )
 
         conversation_id = context.conversation_id
-        session = self._session
-
-        if session is None:
-            logger.info("Creating Copilot session")
-            session_config = SessionConfig(**config, on_permission_request=_on_permission, streaming=context.stream)
-            session = await client.create_session(session_config)
-            self._session = session
-            logger.info(f"Copilot session {session.session_id!r} created")
-        else:
-            logger.info(f"Reusing Copilot session {session.session_id!r}")
+        session = await self._get_or_create_session(client, config, _on_permission, context.stream)
 
         tracer = self.tracer or trace.get_tracer(__name__)
         agent_name = self.get_agent_identifier()

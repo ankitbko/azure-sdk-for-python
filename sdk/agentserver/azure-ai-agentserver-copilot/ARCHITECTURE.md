@@ -108,33 +108,46 @@ rules:
 
 ### 3. Session Management
 
-The adapter maintains a **single persistent Copilot session** that is reused
-across all requests.  This preserves context (memory, tool state, conversation
-history) across multiple turns.
+The adapter maintains a **single persistent Copilot session** that survives
+container sleep/wake cycles.  The Copilot SDK persists session state
+(conversation history, tool state, planning context) to disk under
+`~/.copilot/session-state/`.
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant Adapter
     participant CopilotSDK
+    participant Disk
 
-    Client->>Adapter: Request 1
+    Client->>Adapter: Request 1 (cold start)
+    Adapter->>CopilotSDK: list_sessions()
+    CopilotSDK-->>Adapter: [] (none)
     Adapter->>CopilotSDK: create_session()
-    Note over Adapter: Session stored
+    CopilotSDK->>Disk: persist state
     Adapter-->>Client: Response
 
     Client->>Adapter: Request 2
-    Note over Adapter: Reuse existing session
-    Adapter-->>Client: Response (context preserved)
+    Note over Adapter: Reuse in-memory session
+    Adapter-->>Client: Response
 
-    Client->>Adapter: Request 3
-    Note over Adapter: Reuse existing session
+    Note over Adapter: 💤 Container sleeps...
+    Note over Adapter: ⏰ Container wakes
+
+    Client->>Adapter: Request 3 (after wake)
+    Adapter->>CopilotSDK: list_sessions()
+    CopilotSDK->>Disk: read persisted state
+    CopilotSDK-->>Adapter: [session-xyz]
+    Adapter->>CopilotSDK: resume_session("session-xyz")
     Adapter-->>Client: Response (context preserved)
 ```
 
-The session is created lazily on the first request and reused for the
-lifetime of the adapter process.  This means all conversation history,
-tool state, and skill context are preserved across turns.
+**Session lifecycle:**
+1. **First request** — no in-memory session, no persisted sessions → create new
+2. **Subsequent requests** — in-memory session available → reuse directly
+3. **After sleep/wake** — in-memory session lost, persisted session on disk →
+   discover via `list_sessions()` and resume
+4. **Resume failure** — persisted session corrupted or deleted → create new
 
 ### 4. Response Conversion
 

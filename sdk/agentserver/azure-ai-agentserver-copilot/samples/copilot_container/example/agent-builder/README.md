@@ -12,7 +12,7 @@ Users describe the agent they want, and this agent:
 
 - The `fa` (foundry-agent) CLI wheel built from the private repo `coreai-microsoft/hosted-agent-cli`
 - Access to the ACR registry `acrhostedagentbugbash`
-- The base Copilot adapter image `acrhostedagentbugbash.azurecr.io/ghcp-adapter:vnext-5`
+- The base Copilot adapter image `acrhostedagentbugbash.azurecr.io/ghcp-adapter:vnext-6`
 
 ## Build
 

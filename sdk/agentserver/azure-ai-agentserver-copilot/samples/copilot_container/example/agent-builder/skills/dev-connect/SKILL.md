@@ -1,5 +1,5 @@
 ---
-name: vscode-tunnel
+name: dev-connect
 description: Sets up and starts a VS Code tunnel for remote development when the user types /dev
 ---
 
